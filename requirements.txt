@@ -1,0 +1,2 @@
+ad5593r>=0.1.1
+adafruit-circuitpython-tca9548a>=0.8.6

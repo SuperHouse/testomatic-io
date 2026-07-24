@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iomod"
+version = "0.1.0"
+description = "Control multiple I/O expander modules through a TCA9548A I2C multiplexer"
+readme = "README_IOMod.md"
+authors = [{name = "Jonathan Oxer", email = "jon@oxer.com.au"}]
+requires-python = ">=3.11"
+dependencies = [
+    "ad5593r>=0.1.1",
+    "adafruit-circuitpython-tca9548a>=0.8.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/SuperHouse/iomod-python"
+
+[tool.setuptools.packages.find]
+include = ["iomod*"]

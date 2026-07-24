@@ -12,7 +12,7 @@ Hardware setup:
 """
 
 import time
-import iomod_library as iomod
+import iomod
 
 def main():
     """Main example function"""

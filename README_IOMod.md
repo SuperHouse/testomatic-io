@@ -1,10 +1,10 @@
 # IOMod Library
 
-A Python wrapper library for controlling multiple AD5593R modules through a TCA9548A I2C multiplexer.
+A Python wrapper library for controlling multiple IOMOD I/O Expander Modules through a TCA9548A I2C multiplexer.
 
 ## Overview
 
-The IOMod library provides a high-level interface for managing multiple AD5593R ADC/DAC/GPIO modules connected through a TCA9548A I2C multiplexer. It allows you to easily select specific modules and perform digital and analog operations on them.
+The IOMod library provides a high-level interface for managing multiple ADC/DAC/GPIO modules connected through a TCA9548A I2C multiplexer. It allows you to easily select specific modules and perform digital and analog operations on them.
 
 ## Features
 
@@ -19,7 +19,7 @@ The IOMod library provides a high-level interface for managing multiple AD5593R 
 ## Hardware Requirements
 
 - TCA9548A I2C multiplexer
-- One or more AD5593R modules (configured with I2C address 0x10)
+- One or more IOMOD modules (connected via I2C)
 - Compatible I2C bus (e.g., Raspberry Pi I2C)
 
 ## Dependencies

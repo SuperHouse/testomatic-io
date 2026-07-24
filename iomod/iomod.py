@@ -24,7 +24,7 @@ Usage example:
 
 import board
 import adafruit_tca9548a
-from ad5593r_library import AD5593R
+from ad5593r import AD5593R
 
 # Constants for digital states
 HIGH = 1
