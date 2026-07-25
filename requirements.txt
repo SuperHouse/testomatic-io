@@ -1,2 +1,3 @@
+# Not currently imported by the AD5593R driver — see pyproject.toml for why
 ad5593r>=0.1.1
 adafruit-circuitpython-tca9548a>=0.8.6

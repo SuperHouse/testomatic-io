@@ -6,10 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "iomod"
 version = "0.1.0"
 description = "Control multiple I/O expander modules through a TCA9548A I2C multiplexer"
-readme = "README_IOMod.md"
+readme = "README.md"
 authors = [{name = "Jonathan Oxer", email = "jon@oxer.com.au"}]
 requires-python = ">=3.11"
 dependencies = [
+    # Not currently imported: the published API opens its own smbus2 connection
+    # scoped to a bus number and can't be routed through the TCA9548A mux, so
+    # the AD5593R driver (iomod/drivers/ad5593r.py) implements the protocol
+    # in-house instead. Kept here pending an upstream release that accepts an
+    # injectable I2C transport.
     "ad5593r>=0.1.1",
     "adafruit-circuitpython-tca9548a>=0.8.6",
 ]

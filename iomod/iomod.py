@@ -1,46 +1,65 @@
 #!/usr/bin/env python3
 """
-IOMod Library - Wrapper for AD5593R with TCA9548A Multiplexer Support
+IOMod Library - Wrapper for I/O Expander Modules with TCA9548A Multiplexer Support
 
-This library provides a high-level interface for controlling multiple AD5593R modules
-through a TCA9548A I2C multiplexer. It allows you to select a specific module and
-then perform digital/analog operations on that module.
+This library provides a high-level interface for controlling multiple I/O
+expander modules (e.g. AD5593R, MCP23008) through a TCA9548A I2C multiplexer.
+It allows you to select a specific module and then perform digital/analog
+operations on that module. The expander chip on each module is identified
+automatically by its I2C address; see iomod/drivers/ for supported chips and
+how to add new ones.
 
 Usage example:
-    import iomod_library as iomod
-    
+    import iomod
+
     # Initialize the IOMod system
     iomod.init()
-    
-    # Select module 3 and write HIGH to pin 4
-    iomod.digitalwrite(3, 4, iomod.HIGH)
-    
-    # Select module 2 and read from pin 1
-    value = iomod.digitalread(2, 1)
-    
-    # Select module 1 and read analog value from pin 3
-    voltage = iomod.analogread(1, 3)
+
+    # Select module D and write HIGH to pin 4
+    iomod.digitalwrite('D', 4, iomod.HIGH)
+
+    # Select module C and read from pin 1
+    value = iomod.digitalread('C', 1)
+
+    # Select module B and read analog value from pin 3
+    voltage = iomod.analogread('B', 3)
+
+Modules can be referenced either by letter ('A'-'H', preferred) or by their
+underlying numeric channel (0-7) on the TCA9548A multiplexer.
 """
 
 import board
 import adafruit_tca9548a
-from ad5593r import AD5593R
 
-# Constants for digital states
-HIGH = 1
-LOW  = 0
+from .constants import HIGH, LOW, INPUT, OUTPUT, ADC, DAC
+from .drivers import identify_driver
 
-# Constants for pin modes
-INPUT  = 1
-OUTPUT = 2
-ADC  = 3
-DAC  = 4
+# Module identifiers: TCA9548A channels 0-7 map to letters 'A'-'H'
+_MODULE_LETTERS = "ABCDEFGH"
+
+def _module_index(module_id):
+    """
+    Convert a module identifier to its numeric channel index (0-7)
+
+    Args:
+        module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
+    """
+    if isinstance(module_id, str):
+        if len(module_id) != 1 or module_id.upper() not in _MODULE_LETTERS:
+            raise ValueError(f"Invalid module '{module_id}'. Must be a letter A-H.")
+        return _MODULE_LETTERS.index(module_id.upper())
+    return module_id
+
+def _module_letter(module_id):
+    """Convert a numeric channel index (0-7) to its module letter ('A'-'H')"""
+    return _MODULE_LETTERS[module_id]
 
 class ChannelI2CAdapter:
     """
-    Adapter to provide readfrom/writeto/scan API expected by AD5593R over a
-    CircuitPython TCA9548A channel, which exposes readfrom_into/writeto.
-    Each call acquires/releases the I2C lock to be safe across operations.
+    Adapter to provide the readfrom/writeto/scan API expected by expander
+    drivers over a CircuitPython TCA9548A channel, which exposes
+    readfrom_into/writeto. Each call acquires/releases the I2C lock to be
+    safe across operations.
     """
     def __init__(self, channel):
         self._ch = channel
@@ -85,7 +104,8 @@ class ChannelI2CAdapter:
 
 class IOMod:
     """
-    IOMod class for managing multiple AD5593R modules through TCA9548A multiplexer
+    IOMod class for managing multiple I/O expander modules through a TCA9548A
+    multiplexer, auto-detecting the expander chip on each module
     """
     
     def __init__(self):
@@ -115,9 +135,15 @@ class IOMod:
             raise RuntimeError(f"Failed to initialize IOMod system: {e}")
     
     def _validate_module_id(self, module_id):
-        """Validate module ID is within valid range (0-7)"""
+        """
+        Validate a module identifier and normalize it to a numeric channel index (0-7)
+
+        Args:
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
+        """
+        module_id = _module_index(module_id)
         if not 0 <= module_id <= 7:
-            raise ValueError(f"Invalid module ID {module_id}. Must be 0-7.")
+            raise ValueError(f"Invalid module ID {module_id}. Must be 0-7 (or letter A-H).")
         return module_id
     
     def _validate_pin(self, pin):
@@ -128,50 +154,57 @@ class IOMod:
     
     def _get_module(self, module_id):
         """
-        Get or create AD5593R module instance for the specified module ID
-        
+        Get or create the expander driver instance for the specified module ID.
+        The expander chip is identified automatically from the I2C address(es)
+        found on the module's multiplexer channel.
+
         Args:
-            module_id (int): Module ID (0-7)
-            
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
+
         Returns:
-            AD5593R: Configured AD5593R instance for the module
+            ExpanderDriver: Configured driver instance for the module
         """
         module_id = self._validate_module_id(module_id)
-        
+
         if not self._initialized:
             raise RuntimeError("IOMod system not initialized. Call init() first.")
-        
+
         # Return cached module if available
         if module_id in self.modules:
             return self.modules[module_id]
-        
+
+        # Wrap the TCA channel with an adapter exposing readfrom/writeto
+        channel_adapter = ChannelI2CAdapter(self.tca[module_id])
+        addresses = channel_adapter.scan()
+        driver_cls, address = identify_driver(channel_adapter, addresses)
+        if driver_cls is None:
+            raise RuntimeError(f"No supported I/O expander found on module {_module_letter(module_id)}")
+
         try:
-            # Wrap the TCA channel with an adapter exposing readfrom/writeto
-            channel_adapter = ChannelI2CAdapter(self.tca[module_id])
-            # Create AD5593R instance for this channel
-            ad5593r = AD5593R(channel_adapter, address=0x10)
-            self.modules[module_id] = ad5593r
-            print(f"Module {module_id} initialized successfully")
-            return ad5593r
+            driver = driver_cls(channel_adapter, address)
+            self.modules[module_id] = driver
+            print(f"Module {_module_letter(module_id)}: {driver_cls.NAME} initialized successfully")
+            return driver
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize module {module_id}: {e}")
+            raise RuntimeError(f"Failed to initialize module {_module_letter(module_id)}: {e}")
     
     def select_module(self, module_id):
         """
         Select a specific module for operations
-        
+
         Args:
-            module_id (int): Module ID to select (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
         """
+        module_id = self._validate_module_id(module_id)
         self.current_module = self._get_module(module_id)
-        print(f"Selected module {module_id}")
+        print(f"Selected module {_module_letter(module_id)}")
     
     def digitalwrite(self, module_id, pin, value):
         """
         Write a digital value to a pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             value (int): HIGH (1) or LOW (0)
         """
@@ -179,20 +212,17 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Configure pin as output if not already
-        module.OUTPUT(pin)
-        
-        # Write the value
-        module.digitalWrite(pin, value)
-        print(f"Module {module_id}, Pin {pin}: driving {'HIGH' if value else 'LOW'}")
+
+        # Configure pin as output and write the value
+        module.digital_write(pin, value)
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: driving {'HIGH' if value else 'LOW'}")
     
     def digitalread(self, module_id, pin):
         """
         Read a digital value from a pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             
         Returns:
@@ -202,13 +232,10 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Configure pin as input if not already
-        module.INPUT(pin)
-        
-        # Read the value
-        value = module.digitalRead(pin)
-        print(f"Module {module_id}, Pin {pin}: reading {'HIGH' if value else 'LOW'}")
+
+        # Configure pin as input and read the value
+        value = module.digital_read(pin)
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: reading {'HIGH' if value else 'LOW'}")
         return value
     
     def analogread(self, module_id, pin, average=1):
@@ -216,7 +243,7 @@ class IOMod:
         Read an analog value from a pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             average (int): Number of samples to average (default: 1)
             
@@ -227,25 +254,22 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Configure pin as ADC if not already
-        module.ADC(pin)
-        
-        # Read the value
-        value = module.analogRead(pin, average)
-        print(f"Module {module_id}, Pin {pin}: ADC = {value}")
+
+        # Configure pin as ADC and read the value
+        value = module.analog_read(pin, average)
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: ADC = {value}")
         return value
 
     def setLDACMode(self, module_id, mode):
         module = self._get_module(module_id)
-        module.setLDACMode(mode)
+        module.set_ldac_mode(mode)
     
     def analogwrite(self, module_id, pin, value):
         """
         Write an analog value to a pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             value (int): DAC value (0-4095)
             range (int): DAC range setting (1 = Vref, 2 = 2x Vref, default: 2)
@@ -254,17 +278,17 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Write the value (this will also configure the pin as DAC with the specified range)
-        module.analogWrite(pin, value)
-        print(f"Module {module_id}, Pin {pin}: DAC = {value}")
+
+        # Write the value
+        module.analog_write(pin, value)
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: DAC = {value}")
     
     def readvoltage(self, module_id, pin, average=1):
         """
         Read voltage from a pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             average (int): Number of samples to average (default: 1)
             
@@ -275,13 +299,10 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Configure pin as ADC if not already
-        module.ADC(pin)
-        
-        # Read the voltage
-        voltage = module.readVoltage(pin, average)
-        print(f"Module {module_id}, Pin {pin}: {voltage:.3f}V")
+
+        # Configure pin as ADC and read the voltage
+        voltage = module.read_voltage(pin, average)
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: {voltage:.3f}V")
         return voltage
     
     def pinmode(self, module_id, pin, mode):
@@ -289,7 +310,7 @@ class IOMod:
         Configure pin mode on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
             mode (int): Pin mode (INPUT, OUTPUT, ADC, or DAC)
         """
@@ -297,49 +318,38 @@ class IOMod:
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        if mode == INPUT:
-            module.INPUT(pin)
-            print(f"Module {module_id}, Pin {pin}: Configured as INPUT")
-        elif mode == OUTPUT:
-            module.OUTPUT(pin)
-            print(f"Module {module_id}, Pin {pin}: Configured as OUTPUT")
-        elif mode == ADC:
-            module.ADC(pin)
-            print(f"Module {module_id}, Pin {pin}: Configured as ADC")
-        elif mode == DAC:
-            module.DAC(pin)
-            print(f"Module {module_id}, Pin {pin}: Configured as DAC")
-        else:
-            raise ValueError(f"Invalid pin mode {mode}. Use INPUT, OUTPUT, ADC, or DAC.")
+        module.pin_mode(pin, mode)
+
+        mode_names = {INPUT: "INPUT", OUTPUT: "OUTPUT", ADC: "ADC", DAC: "DAC"}
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: Configured as {mode_names[mode]}")
     
     def setvref(self, module_id, activate=True):
         """
         Enable or disable voltage reference for the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             activate (bool): True to enable, False to disable
         """
         module_id = self._validate_module_id(module_id)
         module = self._get_module(module_id)
-        module.setVref(activate)
-        print(f"Module {module_id}: Vref {'enabled' if activate else 'disabled'}")
+        module.set_vref(activate)
+        print(f"Module {_module_letter(module_id)}: Vref {'enabled' if activate else 'disabled'}")
     
     def getvref(self, module_id):
         """
         Get voltage reference value for the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             
         Returns:
             float: Reference voltage in volts
         """
         module_id = self._validate_module_id(module_id)
         module = self._get_module(module_id)
-        vref = module.getVref()
-        print(f"Module {module_id}: Vref = {vref:.2f}V")
+        vref = module.get_vref()
+        print(f"Module {_module_letter(module_id)}: Vref = {vref:.2f}V")
         return vref
     
     def getdacrange(self, module_id):
@@ -347,15 +357,15 @@ class IOMod:
         Get DAC range setting for the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             
         Returns:
             int: DAC range (1 = 1x Vref, 2 = 2x Vref)
         """
         module_id = self._validate_module_id(module_id)
         module = self._get_module(module_id)
-        dac_range = module.getDACRange()
-        print(f"Module {module_id}: DAC range = {dac_range}x Vref")
+        dac_range = module.get_dac_range()
+        print(f"Module {_module_letter(module_id)}: DAC range = {dac_range}x Vref")
         return dac_range
     
     def setdacrange(self, module_id, range=2):
@@ -363,68 +373,66 @@ class IOMod:
         Set DAC range for the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             range (int): DAC range setting (1 = Vref, 2 = 2x Vref, default: 2)
         """
         module_id = self._validate_module_id(module_id)
         module = self._get_module(module_id)
-        module.setDACRange(range)
-        print(f"Module {module_id}: DAC range set to {'2x Vref' if range == 2 else 'Vref'}")
+        module.set_dac_range(range)
+        print(f"Module {_module_letter(module_id)}: DAC range set to {'2x Vref' if range == 2 else 'Vref'}")
 
     def reset_module(self, module_id):
         """
         Reset the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
         """
         module_id = self._validate_module_id(module_id)
         module = self._get_module(module_id)
         module.reset()
-        print(f"Module {module_id}: Reset")
+        print(f"Module {_module_letter(module_id)}: Reset")
     
     def toggle(self, module_id, pin):
         """
         Toggle a digital output pin on the specified module
         
         Args:
-            module_id (int): Module ID (0-7)
+            module_id: Module letter ('A'-'H', preferred) or numeric channel (0-7)
             pin (int): Pin number (0-7)
         """
         module_id = self._validate_module_id(module_id)
         pin = self._validate_pin(pin)
         
         module = self._get_module(module_id)
-        
-        # Configure pin as output if not already
-        module.OUTPUT(pin)
-        
-        # Toggle the pin
+
+        # Configure pin as output and toggle it
         module.toggle(pin)
-        print(f"Module {module_id}, Pin {pin}: Toggled")
+        print(f"Module {_module_letter(module_id)}, Pin {pin}: Toggled")
     
     def scan_modules(self):
         """
-        Scan for available modules and return a list of working module IDs
-        
+        Scan for available modules and return a list of working module letters
+
         Returns:
-            list: List of available module IDs
+            list: List of available module letters ('A'-'H')
         """
         if not self._initialized:
             raise RuntimeError("IOMod system not initialized. Call init() first.")
-        
+
         available_modules = []
-        
+
         for module_id in range(8):
             try:
                 channel_adapter = ChannelI2CAdapter(self.tca[module_id])
-                # Try to create AD5593R instance
-                _ = AD5593R(channel_adapter, address=0x10)
-                available_modules.append(module_id)
-            except:
+                addresses = channel_adapter.scan()
+                driver_cls, _address = identify_driver(channel_adapter, addresses)
+                if driver_cls is not None:
+                    available_modules.append(_module_letter(module_id))
+            except Exception:
                 # Module not available or error
                 pass
-        
+
         print(f"Available modules: {available_modules}")
         return available_modules
 
@@ -488,7 +496,7 @@ def toggle(module_id, pin):
     _iomod.toggle(module_id, pin)
 
 def scan_modules():
-    """Scan for available modules and return a list of working module IDs"""
+    """Scan for available modules and return a list of working module letters"""
     return _iomod.scan_modules()
 
 def select_module(module_id):
