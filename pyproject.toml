@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SuperHouse/iomod-python"
+Homepage = "https://github.com/SuperHouse/testomatic-io"
 
 [tool.setuptools.packages.find]
 include = ["testomatic_io*"]

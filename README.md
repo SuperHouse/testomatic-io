@@ -1,7 +1,8 @@
 # testomatic-io
 
-A Python hardware abstraction layer for the I/O features of the Testomatic
-chassis and its test modules.
+A Python hardware abstraction layer for the I/O features of the 
+[Testomatic](https://testomatic.io/) PCB test system chassis and its test 
+modules.
 
 ## Overview
 
