@@ -137,6 +137,8 @@ def interactive_mode():
             elif command[0] == "init":
                 chassis.init()
                 print("Chassis initialized")
+            elif not chassis._initialized:
+                print("Chassis not initialized. Run 'init' first.")
             elif command[0] == "scan":
                 modules = chassis.iomod.scan_modules()
                 print(f"Available modules: {modules}")
