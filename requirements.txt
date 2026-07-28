@@ -1,6 +1,7 @@
 adafruit-blinka
 gpiod>=2.0.2
 ad5593r>=0.3.0
+mcp23008>=0.1.0
 adafruit-circuitpython-tca9548a>=0.8.6
 adafruit-circuitpython-ina260
 adafruit-circuitpython-24lc32

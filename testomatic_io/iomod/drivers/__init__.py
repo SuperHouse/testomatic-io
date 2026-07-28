@@ -9,11 +9,13 @@ ad5593r.py for the pattern) and add its class to DRIVERS below.
 
 from .base import ExpanderDriver
 from .ad5593r import AD5593RDriver
+from .mcp23008 import MCP23008Driver
 
 # Ordered list of supported driver classes, checked in order for each
 # I2C address found on a channel.
 DRIVERS = [
     AD5593RDriver,
+    MCP23008Driver,
 ]
 
 

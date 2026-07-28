@@ -60,8 +60,9 @@ and Test-Module-specific drivers beyond the identity EEPROM.
 ## Supported IOMOD Expander Chips
 
 - **AD5593R** — 8-channel ADC/DAC/GPIO, I2C address `0x10`
+- **MCP23008** — 8-channel digital GPIO only (no ADC/DAC), I2C address `0x20`
 
-Support for additional chips (e.g. MCP23008, Serial Wombat) can be added by
+Support for additional chips (e.g. Serial Wombat) can be added by
 writing a driver — see [testomatic_io/iomod/drivers/](testomatic_io/iomod/drivers/)
 for the driver interface and the AD5593R driver as a reference implementation.
 

@@ -167,6 +167,30 @@ def _install_fake_ad5593r():
     sys.modules["ad5593r"] = mod
 
 
+# ---- fake mcp23008 package ----
+
+
+class _FakeMCP23008PinMode:
+    INPUT = "INPUT"
+    OUTPUT = "OUTPUT"
+
+
+class _FakeMCP23008:
+    """Same rationale as _FakeAD5593R: a fresh MagicMock per instantiation,
+    not a MagicMock class, so each driver instance gets its own chip
+    double."""
+
+    def __new__(cls, *args, **kwargs):
+        return MagicMock(name="MCP23008-chip")
+
+
+def _install_fake_mcp23008():
+    mod = types.ModuleType("mcp23008")
+    mod.MCP23008 = _FakeMCP23008
+    mod.PinMode = _FakeMCP23008PinMode
+    sys.modules["mcp23008"] = mod
+
+
 # ---- fake CircuitPython fixed-address device packages ----
 # Minimal placeholders so `import testomatic_io` succeeds; tests that need
 # specific present/absent or read/write behaviour monkeypatch the INA260/
@@ -206,6 +230,7 @@ _install_fake_gpiod()
 _install_fake_gpiochip_glob()
 _install_fake_blinka()
 _install_fake_ad5593r()
+_install_fake_mcp23008()
 _install_fake_circuitpython_devices()
 
 

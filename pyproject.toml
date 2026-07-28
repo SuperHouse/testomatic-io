@@ -22,6 +22,9 @@ dependencies = [
     # routed through the TCA9548A mux's per-channel addressing; 0.3.0 adds
     # pin_mode(). See testomatic_io/iomod/drivers/ad5593r.py.
     "ad5593r>=0.3.0",
+    # Sibling library to ad5593r, same injectable-transport design. See
+    # testomatic_io/iomod/drivers/mcp23008.py.
+    "mcp23008>=0.1.0",
     "adafruit-circuitpython-tca9548a>=0.8.6",
     "adafruit-circuitpython-ina260",
     "adafruit-circuitpython-24lc32",
