@@ -11,6 +11,13 @@ authors = [{name = "Jonathan Oxer", email = "jon@oxer.com.au"}]
 requires-python = ">=3.11"
 dependencies = [
     "adafruit-blinka",
+    # Modern Linux GPIO character-device API, used instead of Blinka's
+    # digitalio for the fixed relay/button/beeper/interrupt pins -- works
+    # identically across Pi 3/4/5 with no board-specific backend (unlike
+    # digitalio, which needs RPi.GPIO on Pi 4 and `lgpio` on Pi 5). See
+    # testomatic_io/gpio.py. 2.0.2 is the first release of the current
+    # (v2) API this code uses.
+    "gpiod>=2.0.2",
     # 0.2.0+ accepts an injectable I2C transport (i2c_bus=), so it can be
     # routed through the TCA9548A mux's per-channel addressing; 0.3.0 adds
     # pin_mode(). See testomatic_io/iomod/drivers/ad5593r.py.
