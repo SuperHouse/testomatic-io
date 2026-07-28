@@ -210,7 +210,16 @@ chassis.power.read_5v()
 chassis.power.read_12v()
 ```
 Read a rail's INA260 sensor. Returns a `PowerReading(voltage, current, power)`
-namedtuple — voltage in V, current in mA, power in mW.
+namedtuple — voltage in V, current in mA, power in mW. Raises `RuntimeError`
+if that rail's sensor wasn't detected on the bus.
+
+```python
+chassis.power.read_3v3_available()
+chassis.power.read_5v_available()
+chassis.power.read_12v_available()
+```
+Check whether a rail's INA260 sensor was detected on the bus, before calling
+`read_*`.
 
 #### `chassis.interrupts`
 
@@ -239,10 +248,14 @@ Drive the piezo beeper.
 #### `chassis.hat_eeprom`
 
 ```python
+chassis.hat_eeprom.present            # False if no EEPROM responded on the bus
 chassis.hat_eeprom.read(address, length)
 chassis.hat_eeprom.write(address, data)
 ```
-Read/write the chassis identity EEPROM (CAT24C32 at `0x50`, I2C bus 0).
+Read/write the chassis identity EEPROM (CAT24C32 at `0x50`, I2C bus 0). If
+no chip responds at that address, `present` is `False` and `read`/`write`
+raise `RuntimeError` instead of the underlying I2C probe crashing
+`Chassis.init()`.
 
 ### TestModule
 
@@ -253,6 +266,7 @@ Initialize the Test Module. `i2c_bus0` is bus 0 — pass the same object as
 `Chassis.init()`'s if using both together.
 
 ```python
+test_module.eeprom.present            # False if no Test Module (or no EEPROM) is present
 test_module.eeprom.read(address, length)
 test_module.eeprom.write(address, data)
 ```
@@ -310,6 +324,11 @@ individual functions.
 - **No supported expander found**: No registered driver recognised a chip on
   that module's I2C channel
 - **Module not found**: Module not responding on I2C bus
+- **Fixed I2C device not found**: EEPROMs (`Cat24C32`) and power sensors
+  (`PowerSensors`, INA260) trap the construction-time probe failure instead
+  of raising (see `testomatic_io/i2c_probe.py`) — check `.present` /
+  `present_3v3` etc. (or `chassis.power.read_3v3_available()`) before
+  reading, which otherwise raise `RuntimeError` if called while absent
 - **I2C errors**: Communication failures
 - **Unsupported operation**: A chip-dependent operation (e.g. analog I/O)
   not supported by the expander on that module

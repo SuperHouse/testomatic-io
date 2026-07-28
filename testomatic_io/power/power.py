@@ -54,3 +54,15 @@ class Power:
     def read_12v(self):
         """Read voltage (V), current (mA), and power (mW) on the 12V rail"""
         return PowerReading(*self.sensors.read_12v())
+
+    def read_3v3_available(self):
+        """True if the 3.3V rail's INA260 sensor was detected on the bus"""
+        return self.sensors.present_3v3
+
+    def read_5v_available(self):
+        """True if the 5V rail's INA260 sensor was detected on the bus"""
+        return self.sensors.present_5v
+
+    def read_12v_available(self):
+        """True if the 12V rail's INA260 sensor was detected on the bus"""
+        return self.sensors.present_12v
