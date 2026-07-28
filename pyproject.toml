@@ -27,8 +27,19 @@ dependencies = [
     "adafruit-circuitpython-24lc32",
 ]
 
+[project.optional-dependencies]
+# Lets the whole package import (against tests/conftest.py's hardware
+# stubs) and run on a machine with no real Raspberry Pi.
+dev = ["pytest>=7"]
+
 [project.urls]
 Homepage = "https://github.com/SuperHouse/testomatic-io"
 
 [tool.setuptools.packages.find]
 include = ["testomatic_io*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Puts the repo root on sys.path during test collection so `import
+# testomatic_io` works whether or not the package is installed.
+pythonpath = ["."]

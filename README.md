@@ -98,6 +98,19 @@ logic by stubbing `board`, `adafruit_tca9548a`, `gpiod`, and `busio` with
 fakes before importing `testomatic_io`, rather than trying to run it
 directly.
 
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The test suite stubs the hardware packages above (see `tests/conftest.py`),
+so it runs on any machine — no Raspberry Pi required. It covers driver
+logic, GPIO active-high/low behaviour, and present/absent handling for the
+EEPROMs and power sensors; it does not verify real electrical behaviour,
+which still needs a manual pass against actual hardware.
+
 ## Quick Start
 
 ```python
