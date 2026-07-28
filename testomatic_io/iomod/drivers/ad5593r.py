@@ -7,8 +7,9 @@ that package always opened their own smbus2 connection scoped to a Linux
 bus number, with no way to accept an external transport, so it couldn't be
 routed through the TCA9548A multiplexer's per-channel addressing. As of
 ad5593r 0.2.0 it accepts an injectable `i2c_bus` exposing
-writeto(address, buffer)/readfrom(address, length) -- exactly what
-ChannelI2CAdapter provides -- so it's passed straight through here.
+writeto(address, buffer)/readfrom(address, length) -- exactly what a
+tca9548a.TCA9548AChannel (see testomatic_io/iomod/manager.py) provides --
+so it's passed straight through here.
 
 Original by Tristan Muller for MicroPython (https://101robotics.com), then
 ported to an in-house Python 3 implementation by Jonathan Oxer; this driver

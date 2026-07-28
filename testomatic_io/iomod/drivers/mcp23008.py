@@ -7,8 +7,9 @@ reuse-over-reimplement precedent as AD5593RDriver (see
 testomatic_io/iomod/drivers/ad5593r.py). mcp23008 is a sibling library built
 with the same injectable-transport design as ad5593r: it accepts an
 injectable `i2c_bus` exposing writeto(address, buffer)/readfrom(address,
-length) -- exactly what ChannelI2CAdapter provides -- so it's passed
-straight through here, with no changes needed to ChannelI2CAdapter itself.
+length) -- exactly what a tca9548a.TCA9548AChannel (see
+testomatic_io/iomod/manager.py) provides -- so it's passed straight
+through here, with no adapter needed in between.
 
 MCP23008 is digital I/O only -- no ADC/DAC -- so pin_mode() rejects ADC/DAC
 requests with a clear NotImplementedError instead of the chip silently

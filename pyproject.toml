@@ -25,7 +25,12 @@ dependencies = [
     # Sibling library to ad5593r, same injectable-transport design. See
     # testomatic_io/iomod/drivers/mcp23008.py.
     "mcp23008>=0.1.0",
-    "adafruit-circuitpython-tca9548a>=0.8.6",
+    # Third sibling library, same injectable-transport design -- its
+    # channel objects (tca[n]) natively expose the same readfrom/writeto/
+    # scan shape ad5593r/mcp23008 need, so no adapter is required between
+    # the mux and downstream drivers. See testomatic_io/iomod/manager.py's
+    # BlinkaI2CAdapter, which wraps the upstream Blinka bus once instead.
+    "tca9548a>=0.1.0",
     "adafruit-circuitpython-ina260",
     "adafruit-circuitpython-24lc32",
 ]

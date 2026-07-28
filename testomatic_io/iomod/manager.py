@@ -25,7 +25,7 @@ underlying numeric channel (0-7) on the TCA9548A multiplexer.
 """
 
 import board
-import adafruit_tca9548a
+import tca9548a
 
 from .constants import INPUT, OUTPUT, ADC, DAC
 from .drivers import identify_driver
@@ -50,12 +50,18 @@ def _module_letter(module_id):
     """Convert a numeric channel index (0-7) to its module letter ('A'-'H')"""
     return _MODULE_LETTERS[module_id]
 
-class ChannelI2CAdapter:
+class BlinkaI2CAdapter:
     """
-    Adapter to provide the readfrom/writeto/scan API expected by expander
-    drivers over a CircuitPython TCA9548A channel, which exposes
-    readfrom_into/writeto. Each call acquires/releases the I2C lock to be
-    safe across operations.
+    Adapter to provide the readfrom/writeto/scan API expected by the
+    `tca9548a` package (and, through it, every downstream expander driver)
+    over a Blinka/CircuitPython I2C bus, which exposes readfrom_into/writeto
+    instead. Each call acquires/releases the I2C lock to be safe across
+    operations.
+
+    Wraps the whole upstream bus once, for the mux's own connection --
+    `tca9548a.TCA9548A`'s channel objects (`tca[n]`) already expose this
+    same readfrom/writeto/scan shape natively, so they're passed straight
+    to expander drivers with no further wrapping needed.
     """
     def __init__(self, channel):
         self._ch = channel
@@ -122,7 +128,10 @@ class IOModManager:
                 i2c_bus = board.I2C()
 
             # Create the TCA9548A object
-            self.tca = adafruit_tca9548a.TCA9548A(i2c_bus)
+            self.tca = tca9548a.TCA9548A(
+                tca9548a.TCA9548A_DEFAULT_ADDRESS,
+                i2c_bus=BlinkaI2CAdapter(i2c_bus),
+            )
             self._initialized = True
             print("IOMod manager initialized successfully")
 
@@ -168,15 +177,16 @@ class IOModManager:
         if module_id in self.modules:
             return self.modules[module_id]
 
-        # Wrap the TCA channel with an adapter exposing readfrom/writeto
-        channel_adapter = ChannelI2CAdapter(self.tca[module_id])
-        addresses = channel_adapter.scan()
-        driver_cls, address = identify_driver(channel_adapter, addresses)
+        # tca[module_id] already exposes the readfrom/writeto/scan shape
+        # expander drivers expect -- no adapter wrapping needed here.
+        channel = self.tca[module_id]
+        addresses = channel.scan()
+        driver_cls, address = identify_driver(channel, addresses)
         if driver_cls is None:
             raise RuntimeError(f"No supported I/O expander found on module {_module_letter(module_id)}")
 
         try:
-            driver = driver_cls(channel_adapter, address)
+            driver = driver_cls(channel, address)
             self.modules[module_id] = driver
             print(f"Module {_module_letter(module_id)}: {driver_cls.NAME} initialized successfully")
             return driver
@@ -427,9 +437,9 @@ class IOModManager:
 
         for module_id in range(8):
             try:
-                channel_adapter = ChannelI2CAdapter(self.tca[module_id])
-                addresses = channel_adapter.scan()
-                driver_cls, _address = identify_driver(channel_adapter, addresses)
+                channel = self.tca[module_id]
+                addresses = channel.scan()
+                driver_cls, _address = identify_driver(channel, addresses)
                 if driver_cls is not None:
                     available_modules.append(_module_letter(module_id))
             except Exception:

@@ -95,7 +95,7 @@ pip install -e .
 Blinka-supported) hardware — `board`/Adafruit-Blinka does platform detection
 at import time and raises `NotImplementedError` on unsupported platforms
 (e.g. a Mac dev machine). When working on this repo without hardware, verify
-logic by stubbing `board`, `adafruit_tca9548a`, `gpiod`, and `busio` with
+logic by stubbing `board`, `tca9548a`, `gpiod`, and `busio` with
 fakes before importing `testomatic_io`, rather than trying to run it
 directly.
 

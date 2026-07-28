@@ -119,7 +119,7 @@ def _install_fake_gpiod():
     sys.modules["gpiod.line"] = line_mod
 
 
-# ---- fake Blinka (board/busio/adafruit_tca9548a) ----
+# ---- fake Blinka (board/busio) ----
 
 
 def _install_fake_blinka():
@@ -133,9 +133,56 @@ def _install_fake_blinka():
     busio_mod.I2C = lambda scl, sda: f"fake-i2c-bus0({scl},{sda})"
     sys.modules["busio"] = busio_mod
 
-    tca_mod = types.ModuleType("adafruit_tca9548a")
-    tca_mod.TCA9548A = lambda i2c: "fake-mux"
-    sys.modules["adafruit_tca9548a"] = tca_mod
+
+# ---- fake tca9548a package ----
+
+
+class _FakeTCA9548AChannel:
+    """
+    Mirrors the real tca9548a.TCA9548AChannel: selects its own channel via
+    the mux's control register before every writeto/readfrom/scan call, so
+    tests can verify IOModManager (and BlinkaI2CAdapter, underneath it)
+    talk to the right channel.
+    """
+
+    def __init__(self, tca, channel):
+        self._tca = tca
+        self._channel = channel
+
+    def _select(self):
+        self._tca._bus.writeto(self._tca.address, bytes([1 << self._channel]))
+
+    def writeto(self, address, buffer):
+        self._select()
+        self._tca._bus.writeto(address, buffer)
+
+    def readfrom(self, address, length):
+        self._select()
+        return self._tca._bus.readfrom(address, length)
+
+    def scan(self):
+        self._select()
+        scan = getattr(self._tca._bus, "scan", None)
+        return scan() if scan is not None else []
+
+
+class _FakeTCA9548A:
+    def __init__(self, device_address, i2c_bus=None, bus_number=1):
+        self.address = device_address
+        self._bus = i2c_bus
+        self._channels = [None] * 8
+
+    def __getitem__(self, channel):
+        if self._channels[channel] is None:
+            self._channels[channel] = _FakeTCA9548AChannel(self, channel)
+        return self._channels[channel]
+
+
+def _install_fake_tca9548a():
+    mod = types.ModuleType("tca9548a")
+    mod.TCA9548A = _FakeTCA9548A
+    mod.TCA9548A_DEFAULT_ADDRESS = 0x70
+    sys.modules["tca9548a"] = mod
 
 
 # ---- fake ad5593r package ----
@@ -229,6 +276,7 @@ def _install_fake_gpiochip_glob():
 _install_fake_gpiod()
 _install_fake_gpiochip_glob()
 _install_fake_blinka()
+_install_fake_tca9548a()
 _install_fake_ad5593r()
 _install_fake_mcp23008()
 _install_fake_circuitpython_devices()
