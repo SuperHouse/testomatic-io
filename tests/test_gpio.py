@@ -6,6 +6,7 @@ to verify the digitalio -> gpiod swap (see CLAUDE.md); committing them means
 the same check is available for free if the backend is ever swapped again.
 """
 
+import board
 import pytest
 from gpiod.line import Value
 
@@ -45,3 +46,25 @@ def test_digital_input_reads_externally_driven_value(fake_gpio_lines):
 def test_unknown_line_name_raises():
     with pytest.raises(RuntimeError):
         gpio.digital_output("GPIO99")
+
+
+def test_open_i2c_bus0_falls_back_to_d1_d0_on_pi(monkeypatch):
+    """The fake `board` module has no SCL0/SDA0, matching real Raspberry Pi
+    Blinka boards -- see issue #6."""
+    monkeypatch.delattr(board, "SCL0", raising=False)
+    monkeypatch.delattr(board, "SDA0", raising=False)
+
+    bus0 = gpio.open_i2c_bus0()
+
+    assert bus0 == "fake-i2c-bus0(D1,D0)"
+
+
+def test_open_i2c_bus0_prefers_scl0_sda0_when_defined(monkeypatch):
+    """Boards that do define board.SCL0/SDA0 (e.g. Pico/FTDI/Radxa) should
+    use those rather than the Raspberry-Pi-specific D1/D0 alias."""
+    monkeypatch.setattr(board, "SCL0", "SCL0", raising=False)
+    monkeypatch.setattr(board, "SDA0", "SDA0", raising=False)
+
+    bus0 = gpio.open_i2c_bus0()
+
+    assert bus0 == "fake-i2c-bus0(SCL0,SDA0)"

@@ -98,6 +98,11 @@ def open_i2c_bus0():
     from board.I2C() (bus 1) used by everything else on the chassis. Blinka
     has no board.SCL0/SDA0 on Raspberry Pi; bus 0 is GPIO1/GPIO0 (the
     ID_SC/ID_SD pins), which Blinka exposes as board.D1/board.D0 -- see
-    i2cPorts in adafruit_blinka.microcontroller.bcm2712.pin.
+    i2cPorts in adafruit_blinka.microcontroller.bcm2712.pin. Other
+    Blinka-supported boards that do define board.SCL0/SDA0 (e.g. Pico/FTDI/
+    Radxa boards) use those instead, rather than hardcoding to the
+    Raspberry-Pi-specific alias -- see issue #6.
     """
-    return busio.I2C(board.D1, board.D0)
+    scl = getattr(board, "SCL0", board.D1)
+    sda = getattr(board, "SDA0", board.D0)
+    return busio.I2C(scl, sda)
